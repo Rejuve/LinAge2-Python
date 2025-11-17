@@ -2,7 +2,6 @@
 
 [![Paper](https://img.shields.io/badge/Paper-npj%20Aging-blue)](https://doi.org/10.1038/s41514-025-00221-4)
 
-
 A Python implementation of the **LinAge2** biological age clock with enhanced interpretability and missing data handling. This tool predicts mortality risk and biological age from routine clinical lab measurements, providing **actionable feature-level insights** through linear model decomposition.
 
 ---
@@ -33,12 +32,38 @@ Unlike the original R implementation, this version **decomposes the predicted ag
 
 ![Feature Contributions Example](linage2_barchart.png)
 
-*Example: Features are sorted by magnitude and grouped by measurement status (measured vs. imputed). Blue bars indicate "younger" contributions (negative age delta), red bars indicate "older" contributions (positive age delta). Hatched bars represent imputed values.*
+**Reading the Chart**:
+- **X-axis**: Contribution in years (negative = younger, positive = older)
+- **Y-axis**: NHANES feature codes (hover to see full descriptions)
+- **Vertical dashed line at x=0**: Zero contribution reference
+- **Color scale**: 
+  - 🔴 **Red** (right side): Features making you biologically *older* (e.g., high HbA1c, inflammation)
+  - 🔵 **Blue** (left side): Features making you biologically *younger* (e.g., good kidney function, low inflammation)
+  - **Color intensity**: Magnitude of contribution (darker = stronger effect)
+- **Bar patterns**:
+  - **Solid bars**: Values measured from actual lab tests
+  - **Hatched bars (///)**: Values imputed from reference cohort (less reliable)
+- **Sorting**: 
+  1. Measured features first (top), imputed features second (bottom)
+  2. Within each group: sorted by descending absolute contribution
+
+**Example interpretation** (from chart above):
+- `LBXCOT` (smoking status): **+1.8 years** (solid red bar) — largest aging contributor
+- `fs3Score` (healthcare utilization): **+0.3 years** (solid red)
+- `LBXNEPCT` (neutrophils %): **-0.5 years** (solid blue) — de-aging contribution
+- `URXUMASI` (urine albumin): **-0.8 years** (hatched blue) — *imputed* value suggests good kidney function
+
+> **💡 Quick Visual Guide**
+> - **Focus on the extremes**: Longest red bars (right) = biggest aging drivers to address
+> - **Validate hatched bars**: Re-test imputed values (hatched) with actual labs for accuracy
+> - **Balance is key**: Even healthy individuals have some red bars; look at *net* effect (total BA delta)
+> - **Track changes**: Re-run after interventions to see if targeted bars shift leftward (blue)
 
 **Why this matters**:
 - Identifies **which lab abnormalities** drive elevated biological age
-- Enables **targeted interventions** (e.g., "lowering HbA1c by X would reduce BA by Y years")
-- Transparent model behavior (no black-box predictions)
+- Enables **targeted interventions** (e.g., "smoking cessation could reduce BA by ~2 years")
+- **Transparency**: Hatched bars flag imputed values that should be validated with actual tests
+- Guides clinical focus: prioritize interventions on largest red bars
 
 ---
 
@@ -51,7 +76,7 @@ For each missing lab value:
   1. Select reference cohort: same sex, ±5 years age window
   2. Respect 40-year boundary:
      - If age < 40: only use reference subjects aged [age-5, 40)
-     - If age ≥ 40: only use reference subjects aged [40, age+5]
+     - If age ≥ 40: only use reference subjects aged [40, age+5] to reflect original model data preparation
   3. Impute with median value from reference cohort
 ```
 
@@ -129,11 +154,25 @@ Navigate to `http://localhost:7860` in your browser.
 ```
 
 **Feature Contribution Chart**:
-- Bars sorted by magnitude (largest contributors at top)
-- **Color**: Red = aging (positive Δ), Blue = de-aging (negative Δ)
-- **Pattern**: Solid = measured, Hatched = imputed
-- **Groups**: Measured features displayed first, imputed features second
-- **Hover**: Shows raw lab value, z-score, weight, and contribution in years
+- **Horizontal layout**: Features on Y-axis, contribution (years) on X-axis
+- **Zero reference line**: Vertical dashed line at x=0
+- **Color coding**: 
+  - Red (right) = aging factors (positive contribution)
+  - Blue (left) = protective factors (negative contribution)
+  - Intensity scales with magnitude (see color bar on right)
+- **Pattern coding**: 
+  - Solid fill = measured values (high confidence)
+  - Diagonal hatching (///) = imputed values (validate if possible)
+- **Grouping & sorting**: 
+  1. Top section: measured features (sorted by absolute contribution)
+  2. Bottom section: imputed features (sorted by absolute contribution)
+- **Interactive hover**: Shows:
+  - Feature description (human-readable)
+  - Raw lab value entered
+  - Normalized z-score
+  - Model weight (years per SD)
+  - Calculated contribution (years)
+  - Measurement status (Measured/Imputed)
 
 ---
 
@@ -228,13 +267,14 @@ Cox Proportional Hazards Model (age + PC1-PC59)
 Biological Age = CA + Σ(PC_i × β_i) / β_age
 ```
 
-
 ### Performance (from Paper)
 | Metric | LinAge2 | PhenoAge Clinical | GrimAge2 | DunedinPoAm |
 |--------|---------|-------------------|----------|-------------|
 | **20-year mortality AUC** | **0.844** | 0.848 | 0.823 | 0.786 |
 | **10-year mortality AUC** | **0.868** | 0.848 | 0.852 | 0.827 |
 | **Healthspan correlation** | ✓ | ✓ | ✓ | ✓ |
+
+LinAge2 outperforms epigenetic clocks despite using only routine lab tests (no DNA methylation required).
 
 ---
 
@@ -250,3 +290,9 @@ Biological Age = CA + Σ(PC_i × β_i) / β_age
 - NHANES participants and staff
 - Original LinAge2 authors (Fong et al., 2025)
 - `scikit-survival` library for Cox model implementation
+
+---
+
+## 📄 License & Disclaimer
+
+This project is for **research and educational purposes**. Clinical use requires validation in your specific population and appropriate regulatory approval. Not intended as a substitute for professional medical advice.
