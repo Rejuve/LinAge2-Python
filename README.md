@@ -236,7 +236,6 @@ Biological Age = CA + Σ(PC_i × β_i) / β_age
 | **10-year mortality AUC** | **0.868** | 0.848 | 0.852 | 0.827 |
 | **Healthspan correlation** | ✓ | ✓ | ✓ | ✓ |
 
-LinAge2 outperforms epigenetic clocks despite using only routine lab tests (no DNA methylation required).
 ---
 
 ## 📞 Contact
