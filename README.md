@@ -31,7 +31,7 @@ Unlike the original R implementation, this version **decomposes the predicted ag
 - Each lab measurement contributes `±N years` to biological age
 - **Visualization**: Interactive Plotly bar chart showing which features "age" (red) or "de-age" (blue) the individual
 
-![Feature Contributions Example](docs/feature_contributions_example.png)
+![Feature Contributions Example](linage2_barchart.png)
 
 *Example: Features are sorted by magnitude and grouped by measurement status (measured vs. imputed). Blue bars indicate "younger" contributions (negative age delta), red bars indicate "older" contributions (positive age delta). Hatched bars represent imputed values.*
 
