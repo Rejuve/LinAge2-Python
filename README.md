@@ -290,9 +290,3 @@ LinAge2 outperforms epigenetic clocks despite using only routine lab tests (no D
 - NHANES participants and staff
 - Original LinAge2 authors (Fong et al., 2025)
 - `scikit-survival` library for Cox model implementation
-
----
-
-## 📄 License & Disclaimer
-
-This project is for **research and educational purposes**. Clinical use requires validation in your specific population and appropriate regulatory approval. Not intended as a substitute for professional medical advice.
