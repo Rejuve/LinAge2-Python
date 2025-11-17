@@ -32,6 +32,7 @@ Unlike the original R implementation, this version **decomposes the predicted ag
 - **Visualization**: Interactive Plotly bar chart showing which features "age" (red) or "de-age" (blue) the individual
 
 ![Feature Contributions Example](docs/feature_contributions_example.png)
+
 *Example: Features are sorted by magnitude and grouped by measurement status (measured vs. imputed). Blue bars indicate "younger" contributions (negative age delta), red bars indicate "older" contributions (positive age delta). Hatched bars represent imputed values.*
 
 **Why this matters**:
@@ -41,7 +42,7 @@ Unlike the original R implementation, this version **decomposes the predicted ag
 
 ---
 
-### 2. **Smart Missing Data Imputation**
+### 2. **Missing Data Imputation**
 Clinical data is often incomplete. This implementation includes a **sex- and age-stratified imputation** mechanism:
 
 **Algorithm**:
@@ -78,8 +79,8 @@ For each missing lab value:
 ### Installation
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/linage2-python.git
-cd linage2-python
+git clone https://github.com/kolya-rjv/linage2.git
+cd linage2
 
 # Install dependencies
 pip install -r requirements.txt
@@ -93,7 +94,7 @@ pip install -r requirements.txt
 
 ### Run the Web Interface
 ```bash
-python codebook_mapping.py
+python ui.py
 ```
 
 Navigate to `http://localhost:7860` in your browser.
@@ -156,20 +157,6 @@ Each bar represents a feature's contribution, but features are grouped by underl
   
 - **PC2-PC4**: Kidney function, inflammation, anemia
   - See [paper Supplementary Table 5](https://doi.org/10.1038/s41514-025-00221-4) for full PC→mechanism mapping
-
-### Case Study (from Paper Fig. 3)
-**Subject 8881**: 72-year-old male, obese smoker
-- **BA**: 88.7 years (Δ = +16.7 years)
-- **Top contributors**: 
-  - PC1M: +18.6 years (cardiometabolic syndrome)
-  - PC31M: +9.3 years (smoking)
-- **Outcome**: Died from diabetes 5.4 years later
-- **Intervention potential**: GLP-1 agonist + smoking cessation could have reduced BA by ~25 years
-
-**Subject 9106**: 72-year-old male, normal BMI, non-smoker
-- **BA**: 64.4 years (Δ = -7.6 years)
-- **Top contributors**: Low inflammation, good kidney function
-- **Outcome**: Died at age 91 (19 years later)
 
 ---
 
