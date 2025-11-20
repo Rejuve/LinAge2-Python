@@ -112,6 +112,8 @@ feature_names = ['BPXPLS', 'BPXSAR', 'BPXDAR', 'BMXBMI', 'URXUMASI', 'URXUCRSI',
 
 
 
+
+
 def plot_feature_contribs_interactive_np(
     Z_centered: np.ndarray,
     w_feature_years: np.ndarray,
@@ -121,69 +123,105 @@ def plot_feature_contribs_interactive_np(
     title: str | None = None,
     term_age: float | None = None,
     descriptions: dict | pd.Series | None = None,
+    imputed_feature_list: list[str] | None = None,
 ):
     """
     Z_centered : np.ndarray (n_samples × n_features)
     w_feature_years : np.ndarray (n_features,)
     feature_names : list of feature codes (len = n_features)
     descriptions : dict or pd.Series mapping feature -> human-readable text
+    imputed_feature_list : list[str], features that were imputed (for hatch styling)
     """
+    # Build index-aligned Series to avoid any positional misalignment
     dfZ = pd.DataFrame(Z_centered, columns=feature_names)
-    w = pd.Series(np.asarray(w_feature_years), index=feature_names, name="w_years_per_SD")
-    row = dfZ.iloc[subject_idx]
+    row = pd.Series(dfZ.iloc[subject_idx].values, index=feature_names, name="z_centered")
+    w   = pd.Series(np.asarray(w_feature_years),     index=feature_names, name="w_years_per_SD")
 
-    # construct plotting dataframe
-    plot_df = pd.DataFrame({
-        "feature": feature_names,
-        "description": [descriptions.get(f, f) for f in feature_names] if descriptions is not None else feature_names,
-        "z_centered": row.values,
-        "w_years_per_SD": w.values,
-        "contribution_years": (row.values * w.values)/12,
-        "lab_values": raw_features[feature_names].iloc[subject_idx].values
-    }).sort_values("contribution_years")
+    # Descriptions: map by feature code; fall back to code when missing
+    if descriptions is None:
+        desc_s = pd.Series(feature_names, index=feature_names)
+    else:
+        desc_s = pd.Series(feature_names, index=feature_names).map(descriptions).fillna(pd.Series(feature_names, index=feature_names))
 
-    delta_ba = (row.values * w.values).sum()/12+term_age
+    # Raw lab values aligned to feature order (even if raw_features had a different column order)
+    labs_s = (
+        raw_features.reindex(columns=feature_names)  # force order/availability
+                    .iloc[subject_idx]
+                    .rename("lab_values")
+    )
 
-    color_continuous_scale=[(0, "blue"), (0.5, "white"), (1, "red")],
-    range_color=[plot_df["contribution_years"].min(),
-                 plot_df["contribution_years"].max()]
+    # Assemble plotting frame with aligned indices
+    plot_df = pd.concat(
+        {
+            "description":     desc_s,
+            "z_centered":      row,
+            "w_years_per_SD":  w,
+            "lab_values":      labs_s,
+        },
+        axis=1
+    ).reset_index().rename(columns={"index": "feature"})
 
-    vals = plot_df["contribution_years"]
-    m = float(np.nanquantile(np.abs(vals), 0.9))
+    # Contribution in years (using already-centered z)
+    plot_df["contribution_years"] = (plot_df["z_centered"] * plot_df["w_years_per_SD"]) / 12.0
+
+    # Imputed vs measured status
+    if imputed_feature_list:
+        plot_df["is_imputed"] = np.where(plot_df["feature"].isin(imputed_feature_list), "Imputed", "Measured")
+    else:
+        plot_df["is_imputed"] = "Measured"
+    plot_df["is_imputed"] = pd.Categorical(plot_df["is_imputed"], ["Measured", "Imputed"], ordered=True)
+
+    # Sort so measured appear on top, and within each group by contribution
+    plot_df = plot_df.sort_values(by=["is_imputed", "contribution_years"], ascending=[False, True])
+
+    # Robust symmetric color domain
+    vals = plot_df["contribution_years"].to_numpy()
+    m = float(np.nanquantile(np.abs(vals), 0.90))
+    if not np.isfinite(m) or m == 0.0:
+        m = 1e-6
+
+    # Build customdata array before px.bar
+    plot_df["customdata"] = plot_df.apply(
+        lambda r: [r["description"], r["lab_values"], r["z_centered"], r["w_years_per_SD"], r["is_imputed"]],
+        axis=1
+    ).tolist()
     
-    # color scale: red→blue (aging/de-aging)
     fig = px.bar(
         plot_df,
         x="contribution_years",
         y="feature",
         orientation="h",
-        title=title or f"Feature contributions for subject #{subject_idx}",
-        
+        title=title or "LinAge2 — feature contributions (solid = measured, hatched = imputed)",
         color="contribution_years",
-        color_continuous_scale="RdBu_r",         # blue for negative, red for positive
-        range_color=[-m, m],                     # <-- symmetric
+        color_continuous_scale="RdBu_r",
+        range_color=[-m, m],
         color_continuous_midpoint=0,
-        hover_data=["description", "z_centered", "w_years_per_SD", "contribution_years"],
-         width=1600, height=800
+        custom_data=["description", "lab_values", "z_centered", "w_years_per_SD", "is_imputed"],  # ← Use column names
+        width=1600,
+        height=800,
+        pattern_shape="is_imputed",
+        pattern_shape_map={'Measured': "", "Imputed": "/"},
     )
-
-    # nice hover tooltip template
+    
+    # Clean hover (NO customdata assignment here)
     fig.update_traces(
-        customdata=plot_df[["description","lab_values","z_centered","w_years_per_SD"]].values,
         hovertemplate=(
             "<b>%{y}</b><br>%{customdata[0]}<br>"
             "user input: %{customdata[1]}<br>"
             "z (centered): %{customdata[2]:.3f}<br>"
             "weight (yrs/SD): %{customdata[3]:.3f}<br>"
-            "contrib (yrs): %{x:.3f}<extra></extra>"
-        )
+            "contrib (yrs): %{x:.3f}<br>"
+            "<b>%{customdata[4]}</b><extra></extra>"
+        ),
     )
 
     if term_age is not None:
-        fig.add_vline(x=float(term_age)/12, line_dash="dash", line_color="black", annotation_text="Age term")
+        # term_age is in months ⇒ convert to years before drawing
+        fig.add_vline(x=float(term_age) / 12.0, line_dash="dash", line_color="black", annotation_text="Age term")
 
     fig.update_layout(yaxis=dict(dtick=1))
     return fig
+
 
 
 
@@ -364,6 +402,7 @@ def launch_form():
             raw_lab_vals = vals[n_q:-n_lab]  # len == len(LAB_VARIABLES)
             flag_vals = vals[-n_lab:]
 
+            imputed_feature_list = [name for name, flag in zip(LAB_VARIABLES, flag_vals) if flag]
             
             gr.Warning(f"{sum(flag_vals)} lab measurements were imputed")
             
@@ -379,6 +418,7 @@ def launch_form():
 
 
             lab_vals = impute_missing_values(raw_lab_vals, flag_vals, sex, age)
+            
 
 
             # 2) Optional: attach labs to df (prefixed) so you can persist or feed into inference together
@@ -530,15 +570,20 @@ def launch_form():
                 f"- **Δ (BA – CA):** {delta:+.1f} y"
             )
 
+            if not imputed_feature_list:
+                title="LinAge2 (M) — feature contributions"
+            else:
+                title="LinAge2 (M) — feature contributions (solid - measured, hatched-imputed)"
             fig = plot_feature_contribs_interactive_np(
-            Z_centered,
-            w_feature_years,
-            dataMat_user,
-            feature_names,
+            Z_centered = Z_centered,
+            w_feature_years = w_feature_years,
+            raw_features = dataMat_user,
+            feature_names = feature_names,
             subject_idx=subject_idx,
-            title="LinAge2 (M) — feature contributions",
+            title=title,
             term_age=float(term_age[subject_idx])/12 if hasattr(term_age, "__getitem__") else term_age/12,
-            descriptions=nhanes_desc
+            descriptions=nhanes_desc,
+            imputed_feature_list=imputed_feature_list 
             )
             html = pio.to_html(fig, include_plotlyjs="cdn", full_html=False)
 
