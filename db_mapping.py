@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, Optional
 # -----------------------------
 lab_mapping: Dict[int, str] = {
     # Vitals / anthropometry
-    99001: "BPXPLS",  # Pulse rate (beats/min, 60-sec pulse), 11800
+    11800: "BPXPLS",  # Pulse rate (beats/min, 60-sec pulse), 11800
     11810: "BPXSAR",  # Systolic blood pressure (mmHg)
     11820: "BPXDAR",  # Diastolic blood pressure (mmHg)
     # Kidney (urine), check with this 14010
@@ -34,29 +34,29 @@ lab_mapping: Dict[int, str] = {
     13350: "LBXCOT",  # Cotinine / smoking-related
     # CBC (white cells)
     10350: "LBXWBCSI",  # White blood cell count (×10⁹/L)  also WBC
-    99007: "LBXLYPCT",  # Lymphocyte %, 10360
-    99008: "LBXMOPCT",  # Monocyte %, 13160
+    10360: "LBXLYPCT",  # Lymphocyte %, 10360 99007
+    13160: "LBXMOPCT",  # Monocyte %, 13160 99008
     10370: "LBXNEPCT",  # Neutrophil %
     10380: "LBXEOPCT",  # Eosinophil %
     13170: "LBXBAPCT",  # Basophil %
-    99009: "LBDLYMNO",  # Lymphocyte absolute #, 10390
-    99010: "LBDMONO",  # Monocyte absolute #, 13180
+    10390: "LBDLYMNO",  # Lymphocyte absolute #, 10390 99009
+    13180: "LBDMONO",  # Monocyte absolute #, 13180 99010
     10391: "LBDNENO",  # Neutrophil absolute #
-    99011: "LBDEONO",  # Eosinophil absolute #, 13190
-    99012: "LBDBANO",  # Basophil absolute #, 13200
+    13190: "LBDEONO",  # Eosinophil absolute #, 13190 99011
+    13200: "LBDBANO",  # Basophil absolute #, 13200 99012
     # CBC (red cells / platelets)
     13210: "LBXRBCSI", #Red blood cell count (×10¹²/L).
     10400: "LBXHGB", #Hemoglobin (g/dL).
     13220: "LBXHCT", #Hematocrit (%).
-    99013: "LBXMCVSI",  # Mean corpuscular volume, MCV (fL), 13210
-    99014: "LBXMCHSI",  # Mean corpuscular hemoglobin, MCH (pg)., 13230
-    99015: "LBXMC",  #Mean corpuscular hemoglobin concentration, MCHC (g/dL)., 10420
+    10410: "LBXMCVSI",  # Mean corpuscular volume, MCV (fL), 10410 99013
+    13230: "LBXMCHSI",  # Mean corpuscular hemoglobin, MCH (pg)., 13230 99014
+    10420: "LBXMC",  #Mean corpuscular hemoglobin concentration, MCHC (g/dL)., 10420 99015
     10430: "LBXRDW", #Red cell distribution width (%)
     13240: "LBXPLTSI", #Platelet count (×10⁹/L)
     13250: "LBXMPSI", #Mean platelet volume, MPV (fL).
     # Inflammation / glycemia / cardiac
     13440: "LBXCRP", #C-reactive protein (mg/L)
-    99016: "LBXGH",  # Glycohemoglobin (HbA1c, %), 10640
+    10640: "LBXGH",  # Glycohemoglobin (HbA1c, %), 10640 99016
     99017: "SSBNP",  # "N-terminal pro-B-type natriuretic peptide (NT-proBNP, pg/mL).,
     # Basic chem (SI set)
     13280: "LBDSALSI",   # Albumin (g/L).
@@ -85,7 +85,7 @@ ques_mapping: Dict[int, str] = {
     14199: "DIQ010",  # Doctor told you have diabetes?
     14254: "KIQ020",  # Weak/failing kidneys?
     14219: "MCQ010",  # Asthma?
-    99018: "MCQ053",  # Anemia?, 14222
+    99018: "MCQ053",  # Anemia?, 
     14222: "MCQ160A", #Doctor ever said you had arthritis
     14223: "MCQ160B", #Ever told had congestive heart failure
     14224: "MCQ160C", #Ever told you had coronary heart disease
@@ -96,17 +96,17 @@ ques_mapping: Dict[int, str] = {
     99020: "MCQ160I",  # thyroid_other_diseases_of, (yes/no/ 0/1)
     99021: "MCQ160J",  # obesity_and_overweight
     99022: "MCQ160K", #Ever told you had chronic bronchitis
-    99023: "MCQ160L",  #Ever told you had any liver condition 10850
-    99024: "MCQ220",  #had cancer or a malignancy 12160
-    99025: "OSQ010A",  #Broken or fractured a hip 12030
-    99026: "OSQ010B", #Broken or fractured a wrist
-    99027: "OSQ010C",  #Broken or fractured spine 12060
-    99028: "OSQ060",  #Ever told had osteoporosis/brittle bones 10860
-    99030: "PFQ056",  #Experience confusion/memory problems 12100, 12340
+    10850: "MCQ160L",  #Ever told you had any liver condition 10850 99023
+    12160: "MCQ220",  #had cancer or a malignancy 12160 99024
+    12030: "OSQ010A",  #Broken or fractured a hip 12030 99025
+    99026: "OSQ010B", #Broken or fractured a wrist 
+    12060: "OSQ010C",  #Broken or fractured spine 12060 99027
+    10860: "OSQ060",  #Ever told had osteoporosis/brittle bones 10860 99028
+    12340: "PFQ056",  #Experience confusion/memory problems 12100, 12340   99030
     # Self-rated health
     99031: "HUQ010",  #General health condition (not yet in DB; still reserve mapping),
     14211: "HUQ020",  #Health now compared with 1 year ago matches NHANES already (1/2/3), 14211
-    99032: "HUQ050",  #Times received healthcare over past yr (not yet in DB; still reserve mapping), 10740
+    10740: "HUQ050",  #Times received healthcare over past yr (not yet in DB; still reserve mapping), 10740 99032
     99033: "HUQ070", #Overnight hospital patient in last year
 }
 
