@@ -14,6 +14,7 @@ from db_mapping import (
     ques_mapping,
     UNIT_SCALE,
     QUESTION_VALUE_TRANSFORMS,
+    LAB_VALUE_TRANSFORMS
 )
 
 logger = logging.getLogger("linage2_service")
@@ -133,6 +134,7 @@ def _extract_biometrics(payload: Dict[str, Any]) -> Tuple[Optional[float], Optio
         "weight_kg": _to_float(bio.get("weight")),
         "height_cm": _to_float(bio.get("height")),
         "waist_cm": _to_float(bio.get("waist_circumference")),
+        "bmi": _to_float(bio.get("bmi")),
     }
     return age_months, sex, biom, warnings
 
@@ -173,30 +175,44 @@ def _split_and_remap_survey_items(payload: Dict[str, Any]) -> Tuple[Dict[str, fl
         return labs, ques, ["payload.surveys must be a list"]
 
     for it in items:
-        qid = _to_int((it or {}).get("ques_id"))
-        ans_raw = (it or {}).get("answer")
+        it = it or {}
+        qid = _to_int(it.get("ques_id"))
+        ans_raw = it.get("answer")
 
         if qid is None:
             warnings.append("Survey item with missing/invalid ques_id (skipped)")
             continue
 
+        # ---------- Labs ----------
         if qid in lab_mapping:
             nh = lab_mapping[qid]
-            v = _to_float(ans_raw)
+
+            # Apply optional per-lab transform first (e.g., LBXCOT mapping)
+            transformed = ans_raw
             if nh in LAB_VALUE_TRANSFORMS:
-                v = LAB_VALUE_TRANSFORMS[nh](ans_raw)
-        labs[nh] = v
-        continue
+                try:
+                    transformed = LAB_VALUE_TRANSFORMS[nh](ans_raw)
+                except Exception as e:
+                    warnings.append(f"Lab {qid}->{nh}: transform failed for value {ans_raw!r}: {e} (skipped)")
+                    continue
+
+            v = _to_float(transformed)
             if v is None:
                 warnings.append(f"Lab {qid}->{nh}: invalid numeric value {ans_raw!r} (skipped)")
                 continue
+
             labs[nh] = float(v)
             continue
 
+        # ---------- Questions ----------
         if qid in ques_mapping:
             nh = ques_mapping[qid]
             transform = QUESTION_VALUE_TRANSFORMS.get(nh)
-            v_int = transform(ans_raw) if transform is not None else _to_int(ans_raw)
+            try:
+                v_int = transform(ans_raw) if transform is not None else _to_int(ans_raw)
+            except Exception as e:
+                warnings.append(f"Question {qid}->{nh}: transform failed for value {ans_raw!r}: {e} (skipped)")
+                continue
 
             if v_int is None:
                 warnings.append(f"Question {qid}->{nh}: invalid/unmappable value {ans_raw!r} (skipped)")
@@ -232,10 +248,13 @@ def process_payload(payload: Dict[str, Any], bundle: LinAge2Bundle) -> Dict[str,
 
     # Derive BMI from biometrics if missing
     derived_bmi = _derive_bmi(biom.get("weight_kg"), biom.get("height_cm"))
-    if "BMXBMI" not in labs and derived_bmi is not None:
-        labs["BMXBMI"] = derived_bmi
-    elif "BMXBMI" not in labs and derived_bmi is None:
-        warnings.append("BMXBMI not provided and could not be derived from biometrics (weight/height) — will be imputed")
+    if biom.get('bmi') is not None:
+        labs["BMXBMI"] = biom.get('bmi')
+    else:
+        if "BMXBMI" not in labs and derived_bmi is not None:
+            labs["BMXBMI"] = derived_bmi
+        elif "BMXBMI" not in labs and derived_bmi is None:
+            warnings.append("BMXBMI not provided and could not be derived from biometrics (weight/height) — will be imputed")
 
     # Questionnaire defaults
     q_row: Dict[str, Any] = {
