@@ -33,7 +33,7 @@ lab_mapping: Dict[int, str] = {
     99006: "LBDB12SI",  # Vitamin B12 (warning: you noted DB might be dietary intake)
     13350: "LBXCOT",  # Cotinine / smoking-related
     # CBC (white cells)
-    10350: "LBXWBCSI",  # WBC
+    10350: "LBXWBCSI",  # White blood cell count (×10⁹/L)  also WBC
     99007: "LBXLYPCT",  # Lymphocyte %, 10360
     99008: "LBXMOPCT",  # Monocyte %, 13160
     10370: "LBXNEPCT",  # Neutrophil %
@@ -45,41 +45,38 @@ lab_mapping: Dict[int, str] = {
     99011: "LBDEONO",  # Eosinophil absolute #, 13190
     99012: "LBDBANO",  # Basophil absolute #, 13200
     # CBC (red cells / platelets)
-    13210: "LBXRBCSI",
-    10400: "LBXHGB",
-    13220: "LBXHCT",
-    99013: "LBXMCVSI",  # MCV, 13210
-    99014: "LBXMCHSI",  # MCH, 13230
-    99015: "LBXMC",  # MCHC, 10420
-    10430: "LBXRDW",
-    13240: "LBXPLTSI",
-    13250: "LBXMPSI",
+    13210: "LBXRBCSI", #Red blood cell count (×10¹²/L).
+    10400: "LBXHGB", #Hemoglobin (g/dL).
+    13220: "LBXHCT", #Hematocrit (%).
+    99013: "LBXMCVSI",  # Mean corpuscular volume, MCV (fL), 13210
+    99014: "LBXMCHSI",  # Mean corpuscular hemoglobin, MCH (pg)., 13230
+    99015: "LBXMC",  #Mean corpuscular hemoglobin concentration, MCHC (g/dL)., 10420
+    10430: "LBXRDW", #Red cell distribution width (%)
+    13240: "LBXPLTSI", #Platelet count (×10⁹/L)
+    13250: "LBXMPSI", #Mean platelet volume, MPV (fL).
     # Inflammation / glycemia / cardiac
-    13440: "LBXCRP",
-    99016: "LBXGH",  # HbA1c, 10640
-    99017: "SSBNP",  # NT-proBNP,
+    13440: "LBXCRP", #C-reactive protein (mg/L)
+    99016: "LBXGH",  # Glycohemoglobin (HbA1c, %), 10640
+    99017: "SSBNP",  # "N-terminal pro-B-type natriuretic peptide (NT-proBNP, pg/mL).,
     # Basic chem (SI set)
-    13280: "LBDSALSI",  # Albumin
-    10170: "LBXSATSI",  # ALT
-    10190: "LBXSASSI",  # AST
-    10180: "LBXSAPSI",  # ALP
-    10200: "LBDSBUSI",  # BUN (SI) (note scaling)
-    13330: "LBDSCASI",  # Calcium (SI) (note scaling)
-    13290: "LBXSC3SI",  # Bicarbonate
-    10641: "LBDSGLSI",  # Glucose (SI) (note scaling)
-    13300: "LBXSLDSI",  # LDH
-    13310: "LBDSPHSI",  # Phosphorus (note scaling)
-    10290: "LBDSTBSI",  # Total bilirubin (note scaling)
-    10320: "LBDSTPSI",  # Total protein (note scaling)
-    10340: "LBDSUASI",  # Uric acid (note scaling)
-    10230: "LBDSCRSI",  # Creatinine (note scaling)
-    10280: "LBXSNASI",  # Sodium
-    13320: "LBXSKSI",  # Potassium
-    10210: "LBXSCLSI",  # Chloride
-    10240: "LBDSGBSI",  # Globulin (note scaling)
-    99034: "LBDTCSI",  # Total cholesterol, 10310
-    99035: "LBDHDLSI",  # HDL cholesterol, 10300
-    99036: "LBDSTRSI",  # these three things needed for LDLV
+    13280: "LBDSALSI",   # Albumin (g/L).
+    10170: "LBXSATSI",   # Alanine aminotransferase, ALT (U/L).
+    10190: "LBXSASSI",   # Aspartate aminotransferase, AST (U/L).
+    10180: "LBXSAPSI",   # Alkaline phosphatase (U/L).
+    10200: "LBDSBUSI",   # Urea nitrogen (BUN), SI (mmol/L).
+    13330: "LBDSCASI",   # Calcium, SI (mmol/L).
+    13290: "LBXSC3SI",   # Bicarbonate (total CO₂), SI (mmol/L).
+    10641: "LBDSGLSI",   # Glucose, SI (mmol/L).
+    13300: "LBXSLDSI",   # Lactate dehydrogenase, LDH (U/L).
+    13310: "LBDSPHSI",   # Phosphorus (mmol/L).
+    10290: "LBDSTBSI",   # Total bilirubin (µmol/L).
+    10320: "LBDSTPSI",   # Total protein (g/L).
+    10340: "LBDSUASI",   # Uric acid (µmol/L).
+    10230: "LBDSCRSI",   # Creatinine (µmol/L).
+    10280: "LBXSNASI",   # Sodium (mmol/L).
+    13320: "LBXSKSI",    # Potassium (mmol/L).
+    10210: "LBXSCLSI",   # Chloride (mmol/L).
+    10240: "LBDSGBSI",   # Globulin (g/L).
     # LDL-cholesterol : 13960
 }
 
@@ -88,29 +85,29 @@ ques_mapping: Dict[int, str] = {
     14199: "DIQ010",  # Doctor told you have diabetes?
     14254: "KIQ020",  # Weak/failing kidneys?
     14219: "MCQ010",  # Asthma?
-    99018: "MCQ053",  # Arthritis?, 14222
-    14222: "MCQ160A",
-    14223: "MCQ160B",
-    14224: "MCQ160C",
-    99019: "MCQ160D",
-    14225: "MCQ160E",
-    14226: "MCQ160F",
-    14227: "MCQ160G",
+    99018: "MCQ053",  # Anemia?, 14222
+    14222: "MCQ160A", #Doctor ever said you had arthritis
+    14223: "MCQ160B", #Ever told had congestive heart failure
+    14224: "MCQ160C", #Ever told you had coronary heart disease
+    99019: "MCQ160D", #Ever told you had angina/angina pectoris
+    14225: "MCQ160E", #Ever told you had heart attack
+    14226: "MCQ160F", #Ever told you had a stroke
+    14227: "MCQ160G", #emphysema
     99020: "MCQ160I",  # thyroid_other_diseases_of, (yes/no/ 0/1)
     99021: "MCQ160J",  # obesity_and_overweight
-    99022: "MCQ160K",
-    99023: "MCQ160L",  # 10850
-    99024: "MCQ220",  # 12160
-    99025: "OSQ010A",  # 12030
-    99026: "OSQ010B",
-    99027: "OSQ010C",  # 12060
-    99028: "OSQ060",  # 10860
-    99030: "PFQ056",  # 12100, 12340
+    99022: "MCQ160K", #Ever told you had chronic bronchitis
+    99023: "MCQ160L",  #Ever told you had any liver condition 10850
+    99024: "MCQ220",  #had cancer or a malignancy 12160
+    99025: "OSQ010A",  #Broken or fractured a hip 12030
+    99026: "OSQ010B", #Broken or fractured a wrist
+    99027: "OSQ010C",  #Broken or fractured spine 12060
+    99028: "OSQ060",  #Ever told had osteoporosis/brittle bones 10860
+    99030: "PFQ056",  #Experience confusion/memory problems 12100, 12340
     # Self-rated health
-    99031: "HUQ010",  # (not yet in DB; still reserve mapping),
-    14211: "HUQ020",  # matches NHANES already (1/2/3), 14211
-    99032: "HUQ050",  # (not yet in DB; still reserve mapping), 10740
-    99033: "HUQ070",
+    99031: "HUQ010",  #General health condition (not yet in DB; still reserve mapping),
+    14211: "HUQ020",  #Health now compared with 1 year ago matches NHANES already (1/2/3), 14211
+    99032: "HUQ050",  #Times received healthcare over past yr (not yet in DB; still reserve mapping), 10740
+    99033: "HUQ070", #Overnight hospital patient in last year
 }
 
 
