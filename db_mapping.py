@@ -159,9 +159,32 @@ def _yesno_db01_to_nhanes12(x: Any) -> Optional[int]:
         return 1
     if v == 1:
         return 2
-    # If backend accidentally sends NHANES already, allow pass-through for safety:
-    if v in (1, 2):
-        return v
+
+    return None
+
+def _smoke_db012_to_nhanes_lbx_cot(x: Any) -> Optional[int]:
+    """
+    DB smoking question:
+      0 = Yes, every day
+      1 = Yes, some days
+      2 = No
+    LinAge2/NHANES LBXCOT bucket used in this project:
+      0 = Non-smoker
+      1 = Light/Recent
+      2 = Heavy/Current
+
+    Mapping:
+      0 -> 2
+      1 -> 1
+      2 -> 0
+    """
+    v = _to_int(x)
+    if v is None:
+        return None
+        
+    if v in (0, 1, 2):
+        return 2-v
+
     return None
 
 
@@ -194,4 +217,8 @@ QUESTION_VALUE_TRANSFORMS: Dict[str, Callable[[Any], Optional[int]]] = {
 
     # special cases:
     "DIQ010": _identity_int,  # expect NHANES-style 1/2/3 when DB sends it
+}
+
+LAB_VALUE_TRANSFORMS: Dict[str, Callable[[Any], Optional[int]]] = {
+    "LBXCOT": _smoke_db012_to_nhanes_lbx_cot,
 }

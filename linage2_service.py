@@ -183,6 +183,10 @@ def _split_and_remap_survey_items(payload: Dict[str, Any]) -> Tuple[Dict[str, fl
         if qid in lab_mapping:
             nh = lab_mapping[qid]
             v = _to_float(ans_raw)
+            if nh in LAB_VALUE_TRANSFORMS:
+                v = LAB_VALUE_TRANSFORMS[nh](ans_raw)
+        labs[nh] = v
+        continue
             if v is None:
                 warnings.append(f"Lab {qid}->{nh}: invalid numeric value {ans_raw!r} (skipped)")
                 continue
