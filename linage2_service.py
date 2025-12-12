@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import logging
 from dataclasses import dataclass
@@ -7,7 +9,7 @@ import numpy as np
 import pandas as pd
 import joblib
 
-from db_mappings import (
+from db_mapping import (
     lab_mapping,
     ques_mapping,
     UNIT_SCALE,
@@ -16,12 +18,6 @@ from db_mappings import (
 
 logger = logging.getLogger("linage2_service")
 
-
-# -----------------------------
-# External dependencies from your existing codebase
-# -----------------------------
-# These are required to reproduce the exact LinAge2 pipeline you run in ui.py.
-# Keep the imports explicit so failures are obvious.
 from src import (  # type: ignore
     boxCoxTransform,
     foldOutliers,
@@ -33,21 +29,17 @@ from src import (  # type: ignore
     popPCFIfs3,
 )
 
+from ui_sliders import LAB_VARIABLES  # type: ignore
 from imputation import impute_missing_values  # type: ignore
 
 
-# -----------------------------
-# Bundle
-# -----------------------------
 @dataclass(frozen=True)
 class LinAge2Bundle:
-    # sex-specific Cox models
     cox_full_F: Any
     cox_null_F: Any
     cox_full_M: Any
     cox_null_M: Any
 
-    # matrices / training stats needed for inference path
     vMatDat99_F: np.ndarray
     vMatDat99_M: np.ndarray
 
@@ -59,38 +51,24 @@ class LinAge2Bundle:
     coxCovsTrainF: pd.DataFrame
 
     zScoreMax: float = 6.0
-    unit_scale: Dict[str, float] = None  # assigned in loader
+    unit_scale: Dict[str, float] = None
 
 
 def load_linage2_bundle(artifacts_dir: str = "artifacts") -> LinAge2Bundle:
-    """
-    Loads all artifacts needed for LinAge2 inference.
-
-    IMPORTANT:
-    It’s not just the 4 joblib models — your current pipeline also requires:
-    - vMatDat99_F/M
-    - boxCox_lam (logNoLog.csv slice)
-    - dataMat_trans reference
-    - qDataMat_R reference
-    - coxCovsTrainM/F
-    """
     def p(*parts: str) -> str:
         return os.path.join(artifacts_dir, *parts)
 
-    # Models
     cox_full_F = joblib.load(p("cox_full_F.joblib"))
     cox_null_F = joblib.load(p("cox_null_F.joblib"))
     cox_full_M = joblib.load(p("cox_full_M.joblib"))
     cox_null_M = joblib.load(p("cox_null_M.joblib"))
 
-    # Matrices / refs (paths match your ui.py)
     vMatDat99_F = pd.read_csv(p("vMatDat99_F_pre.csv")).values
     vMatDat99_M = pd.read_csv(p("vMatDat99_M_pre.csv")).values
 
     boxCox_lam = pd.read_csv(p("logNoLog.csv")).iloc[1:2, :]
     dataMat_trans_ref = pd.read_csv(p("dataMat_trans.csv"))
 
-    # qDataMat_R location differs in your ui.py (root), so allow override
     qdatamat_r_path = os.getenv("QDATAMAT_R_PATH", p("qDataMat_R.csv"))
     qDataMat_R = pd.read_csv(qdatamat_r_path)
 
@@ -114,9 +92,6 @@ def load_linage2_bundle(artifacts_dir: str = "artifacts") -> LinAge2Bundle:
     )
 
 
-# -----------------------------
-# Parsing helpers
-# -----------------------------
 def _to_int(x: Any) -> Optional[int]:
     if x is None:
         return None
@@ -135,23 +110,48 @@ def _to_float(x: Any) -> Optional[float]:
         return None
 
 
-def _extract_age_months_and_sex(payload: Dict[str, Any]) -> Tuple[Optional[float], Optional[int], List[str]]:
+def _extract_biometrics(payload: Dict[str, Any]) -> Tuple[Optional[float], Optional[int], Dict[str, Optional[float]], List[str]]:
+    """
+    Returns:
+      age_months, sex, biometrics_numeric, warnings
+    biometrics_numeric contains weight_kg, height_cm, waist_cm if present.
+    """
     warnings: List[str] = []
     bio = payload.get("biometrics") or {}
 
     age_years = _to_float(bio.get("age"))
-    if age_years is None:
+    age_months = None if age_years is None else age_years * 12.0
+    if age_months is None:
         warnings.append("Missing biometrics.age")
-        age_months = None
-    else:
-        age_months = age_years * 12.0
 
     sex = _to_int(bio.get("gender"))
     if sex not in (1, 2):
         warnings.append("Missing/invalid biometrics.gender (expected 1=Male, 2=Female)")
         sex = None
 
-    return age_months, sex, warnings
+    biom = {
+        "weight_kg": _to_float(bio.get("weight")),
+        "height_cm": _to_float(bio.get("height")),
+        "waist_cm": _to_float(bio.get("waist_circumference")),
+    }
+    return age_months, sex, biom, warnings
+
+
+def _derive_bmi(weight_kg: Optional[float], height_cm: Optional[float]) -> Optional[float]:
+    if weight_kg is None or height_cm is None:
+        return None
+    if not np.isfinite(weight_kg) or not np.isfinite(height_cm):
+        return None
+    if weight_kg <= 0 or height_cm <= 0:
+        return None
+    h_m = height_cm / 100.0
+    if h_m <= 0:
+        return None
+    bmi = weight_kg / (h_m * h_m)
+    # sanity bounds (keeps garbage payloads from poisoning output)
+    if bmi < 5 or bmi > 120:
+        return None
+    return float(bmi)
 
 
 def _apply_unit_scaling(labs: Dict[str, float], unit_scale: Dict[str, float]) -> Dict[str, float]:
@@ -159,17 +159,11 @@ def _apply_unit_scaling(labs: Dict[str, float], unit_scale: Dict[str, float]) ->
     for k, v in list(out.items()):
         factor = unit_scale.get(k)
         if factor is not None:
-            out[k] = v * factor
+            out[k] = float(v) * float(factor)
     return out
 
 
 def _split_and_remap_survey_items(payload: Dict[str, Any]) -> Tuple[Dict[str, float], Dict[str, int], List[str]]:
-    """
-    Reads payload['surveys'] which contains DB ids + DB-coded answers and returns:
-
-    - labs_by_nhanes: {"LBDSGLSI": 5.1, ...} (floats)
-    - ques_by_nhanes: {"BPQ020": 2, "HUQ020": 3, ...} (ints, already NHANES-coded)
-    """
     warnings: List[str] = []
     labs: Dict[str, float] = {}
     ques: Dict[str, int] = {}
@@ -186,7 +180,6 @@ def _split_and_remap_survey_items(payload: Dict[str, Any]) -> Tuple[Dict[str, fl
             warnings.append("Survey item with missing/invalid ques_id (skipped)")
             continue
 
-        # Lab?
         if qid in lab_mapping:
             nh = lab_mapping[qid]
             v = _to_float(ans_raw)
@@ -196,15 +189,10 @@ def _split_and_remap_survey_items(payload: Dict[str, Any]) -> Tuple[Dict[str, fl
             labs[nh] = float(v)
             continue
 
-        # Questionnaire?
         if qid in ques_mapping:
             nh = ques_mapping[qid]
             transform = QUESTION_VALUE_TRANSFORMS.get(nh)
-            if transform is None:
-                # Explicitness: still do a formal "int cast" transform
-                v_int = _to_int(ans_raw)
-            else:
-                v_int = transform(ans_raw)
+            v_int = transform(ans_raw) if transform is not None else _to_int(ans_raw)
 
             if v_int is None:
                 warnings.append(f"Question {qid}->{nh}: invalid/unmappable value {ans_raw!r} (skipped)")
@@ -218,23 +206,11 @@ def _split_and_remap_survey_items(payload: Dict[str, Any]) -> Tuple[Dict[str, fl
     return labs, ques, warnings
 
 
-# -----------------------------
-# Core inference
-# -----------------------------
 def process_payload(payload: Dict[str, Any], bundle: LinAge2Bundle) -> Dict[str, Any]:
-    """
-    Returns:
-      {
-        "success": bool,
-        "data": {...} or None,
-        "errors": [...],
-        "warnings": [...]
-      }
-    """
     errors: List[str] = []
     warnings: List[str] = []
 
-    age_months, sex, w0 = _extract_age_months_and_sex(payload)
+    age_months, sex, biom, w0 = _extract_biometrics(payload)
     warnings.extend(w0)
 
     if age_months is None:
@@ -248,41 +224,43 @@ def process_payload(payload: Dict[str, Any], bundle: LinAge2Bundle) -> Dict[str,
     if errors:
         return {"success": False, "data": None, "errors": errors, "warnings": warnings}
 
-    # Scale units to NHANES conventions
     labs = _apply_unit_scaling(labs_raw, bundle.unit_scale or {})
 
-    # -----------------------------
-    # Questionnaire defaults (mirror Gradio CODEBOOK defaults)
-    # -----------------------------
-    q_defaults: Dict[str, Any] = {
+    # Derive BMI from biometrics if missing
+    derived_bmi = _derive_bmi(biom.get("weight_kg"), biom.get("height_cm"))
+    if "BMXBMI" not in labs and derived_bmi is not None:
+        labs["BMXBMI"] = derived_bmi
+    elif "BMXBMI" not in labs and derived_bmi is None:
+        warnings.append("BMXBMI not provided and could not be derived from biometrics (weight/height) — will be imputed")
+
+    # Questionnaire defaults
+    q_row: Dict[str, Any] = {
         "SEQN": 1,
         "RIAGENDR": int(sex),
-        "RIDAGEEX": float(age_months),  # months
+        "RIDAGEEX": float(age_months),
 
-        "BPQ020": 2, "DIQ010": 2, "KIQ020": 2, "MCQ010": 2, "MCQ053": 2,
+        "BPQ020": 2,
+        "DIQ010": 2,
+        "KIQ020": 2,
+        "MCQ010": 2,
+        "MCQ053": 2,
+
         "MCQ160A": 2, "MCQ160B": 2, "MCQ160C": 2, "MCQ160D": 2, "MCQ160E": 2,
         "MCQ160F": 2, "MCQ160G": 2, "MCQ160I": 2, "MCQ160J": 2, "MCQ160K": 2, "MCQ160L": 2,
         "MCQ220": 2,
-        "OSQ010A": 2, "OSQ010B": 2, "OSQ010C": 2, "OSQ060": 2,
-        "PFQ056": 2, "HUQ070": 2,
 
-        "HUQ010": 3, "HUQ020": 3,
+        "OSQ010A": 2, "OSQ010B": 2, "OSQ010C": 2, "OSQ060": 2,
+        "PFQ056": 2,
+        "HUQ070": 2,
+
+        "HUQ010": 3,
+        "HUQ020": 3,
         "HUQ050": 0,
     }
-    q_defaults.update(ques_raw)
-    q_df = pd.DataFrame([q_defaults])
+    q_row.update(ques_raw)
+    q_df = pd.DataFrame([q_row])
 
-    # -----------------------------
-    # Lab features: create vector aligned to LAB_VARIABLES order (from ui_sliders)
-    # -----------------------------
-    # The imputer expects values+flags in LAB_VARIABLES order, same as your Gradio app.
-    # We import LAB_VARIABLES indirectly through imputation.py; so we reconstruct raw/flag
-    # using whatever labs were provided.
-    #
-    # NOTE: imputation.py already zips LAB_VARIABLES with raw_vals/flags, so we must pass
-    # raw_vals/flags in that same order.
-    from ui_sliders import LAB_VARIABLES  # local import to keep module load lighter
-
+    # Build raw lab vector + missing flags
     raw_vals: List[float] = []
     flags: List[bool] = []
     for code in LAB_VARIABLES:
@@ -300,20 +278,12 @@ def process_payload(payload: Dict[str, Any], bundle: LinAge2Bundle) -> Dict[str,
         lab_vals_imputed = impute_missing_values(raw_vals, flags, int(sex), float(age_months))
     except Exception as e:
         logger.exception("Imputation failed")
-        return {
-            "success": False,
-            "data": None,
-            "errors": [f"Imputation failed: {e}"],
-            "warnings": warnings,
-        }
+        return {"success": False, "data": None, "errors": [f"Imputation failed: {e}"], "warnings": warnings}
 
-    # Build dataMat_user exactly like ui.py: labs + SEQN
     dataMat_user = pd.DataFrame({name: [val] for name, val in zip(LAB_VARIABLES, lab_vals_imputed)})
     dataMat_user.insert(0, "SEQN", q_df["SEQN"])
 
-    # -----------------------------
-    # Derived features (mirror ui.py)
-    # -----------------------------
+    # Derived features
     try:
         dataMat_user["fs1Score"] = popPCFIfs1(q_df)
         dataMat_user["fs2Score"] = popPCFIfs2(q_df)
@@ -326,50 +296,24 @@ def process_payload(payload: Dict[str, Any], bundle: LinAge2Bundle) -> Dict[str,
         dataMat_user["crAlbRat"] = albu / (crea * 1.1312 * 10 ** -4)
     except Exception as e:
         logger.exception("Derived feature computation failed")
-        return {
-            "success": False,
-            "data": None,
-            "errors": [f"Derived feature computation failed: {e}"],
-            "warnings": warnings,
-        }
+        return {"success": False, "data": None, "errors": [f"Derived feature computation failed: {e}"], "warnings": warnings}
 
-    # -----------------------------
-    # Transform / normalize / fold / project / compute BA + contributions
-    # -----------------------------
+    # Inference pipeline
     try:
         initAge_user = np.asarray([float(age_months)], dtype=float)
 
-        # BoxCox transform
         dataMat_trans_user = boxCoxTransform(bundle.boxCox_lam, dataMat_user)
-
-        # ui.py drops these before normAsZscores
-        for c in ["LBDTCSI", "LBDHDLSI", "LBDSTRSI"]:
-            if c in dataMat_trans_user.columns:
-                dataMat_trans_user = dataMat_trans_user.drop(columns=[c])
-
-        # IMPORTANT: mirror ui.py call shape (they pass SEQN-containing DF)
         dataMatNorm_user = normAsZscores_99_young_mf(
-            dataMat_trans_user,       # includes SEQN
+            dataMat_trans_user.drop(['LBDTCSI', 'LBDHDLSI', 'LBDSTRSI'], axis=1),
             q_df,
             bundle.dataMat_trans_ref,
             bundle.qDataMat_R,
         )
-
-        # Fold outliers then drop SEQN col for matrix
         dataMatUser_folded = foldOutliers(dataMatNorm_user, float(bundle.zScoreMax))
 
-        if dataMatUser_folded.shape[1] < 2:
-            return {
-                "success": False,
-                "data": None,
-                "errors": ["Post-fold matrix has no feature columns (unexpected artifact mismatch)."],
-                "warnings": warnings,
-            }
+        feature_order = list(dataMatUser_folded.columns[1:])
+        inputMat_user = dataMatUser_folded.iloc[:, 1:].to_numpy(dtype=float)
 
-        feature_order = list(dataMatUser_folded.columns[1:])  # drop SEQN
-        inputMat_user = dataMatUser_folded.iloc[:, 1:].values.astype(float)  # (1, n_features)
-
-        # Sex-specific selection
         if int(sex) == 1:
             vMatDat99 = bundle.vMatDat99_M
             coxModel = bundle.cox_full_M
@@ -384,15 +328,6 @@ def process_payload(payload: Dict[str, Any], bundle: LinAge2Bundle) -> Dict[str,
         pcMat_user = projectToSVD(inputMat_user, vMatDat99)
         pcMat_user = pd.DataFrame(pcMat_user, columns=[f"PC{i+1}" for i in range(pcMat_user.shape[1])])
 
-        sex_user = np.asarray([float(sex)], dtype=float)
-
-        coxCovs_user = np.column_stack([initAge_user, pcMat_user.values, sex_user])
-        coxCovs_user = pd.DataFrame(
-            coxCovs_user,
-            columns=["chronAge"] + list(pcMat_user.columns) + ["sex_user"],
-        )
-
-        # Contribution weights (mirror ui.py)
         pc_indices = [int(x[2:]) - 1 for x in coxModel.feature_names_in_ if x.startswith("PC")]
 
         beta_full = np.zeros(pcMat_user.shape[1], dtype=float)
@@ -401,7 +336,7 @@ def process_payload(payload: Dict[str, Any], bundle: LinAge2Bundle) -> Dict[str,
         beta_age_null = float(nullModel.coef_[0])
         beta_age_full = float(coxModel.coef_[0])
 
-        w_feature_years = (vMatDat99 @ beta_full) / beta_age_null
+        w_feature_months_per_sd = (vMatDat99 @ beta_full) / beta_age_null
         w_age = (beta_age_full / beta_age_null) - 1.0
 
         mu_PC = np.zeros(pcMat_user.shape[1], dtype=float)
@@ -414,26 +349,27 @@ def process_payload(payload: Dict[str, Any], bundle: LinAge2Bundle) -> Dict[str,
         mu_age = float(coxCovsTrain["chronAge"].mean())
 
         mu_Z = mu_PC @ vMatDat99.T
-        Z_centered = inputMat_user - mu_Z  # (1, n_features)
+        Z_centered = inputMat_user - mu_Z
 
-        term_features = float(Z_centered @ w_feature_years)
-        term_age = float((initAge_user - mu_age) * w_age)
+        term_features = float(Z_centered @ w_feature_months_per_sd)  # months
+        term_age = float((initAge_user - mu_age) * w_age)            # months
 
         delta_ba_years = (term_features + term_age) / 12.0
         chrono_years = float(initAge_user[0] / 12.0)
         bio_years = chrono_years + float(delta_ba_years)
 
-        # Per-feature contributions to delta in years
-        contrib_vec = (Z_centered.reshape(-1) * np.asarray(w_feature_years).reshape(-1)) / 12.0
+        contrib_years = (Z_centered.reshape(-1) * np.asarray(w_feature_months_per_sd).reshape(-1)) / 12.0
+        n = min(len(feature_order), contrib_years.shape[0])
+        imputed_set = set(imputed_features)
 
-        n = min(len(feature_order), contrib_vec.shape[0])
         feature_contributions = [
             {
                 "feature": feature_order[i],
-                "contribution_years": float(contrib_vec[i]),
+                "contribution_years": float(contrib_years[i]),
+                "is_imputed": feature_order[i] in imputed_set,
             }
             for i in range(n)
-            if np.isfinite(contrib_vec[i])
+            if np.isfinite(contrib_years[i])
         ]
         feature_contributions.sort(key=lambda d: d["contribution_years"], reverse=True)
 
@@ -454,9 +390,4 @@ def process_payload(payload: Dict[str, Any], bundle: LinAge2Bundle) -> Dict[str,
 
     except Exception as e:
         logger.exception("Inference failed")
-        return {
-            "success": False,
-            "data": None,
-            "errors": [f"Inference failed: {e}"],
-            "warnings": warnings,
-        }
+        return {"success": False, "data": None, "errors": [f"Inference failed: {e}"], "warnings": warnings}

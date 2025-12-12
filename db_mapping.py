@@ -84,6 +84,9 @@ lab_mapping: Dict[int, str] = {
     13320: "LBXSKSI",   # Potassium
     10210: "LBXSCLSI",  # Chloride
     10240: "LBDSGBSI",  # Globulin (note scaling)
+    99034: "LBDTCSI",
+    99035: 'LBDHDLSI',
+    99036: 'LBDSTRSI' #these three things needed for LDLV
 }
 
 ques_mapping: Dict[int, str] = {
@@ -117,6 +120,7 @@ ques_mapping: Dict[int, str] = {
     99031: "HUQ010",   # (not yet in DB; still reserve mapping)
     14211: "HUQ020",   # matches NHANES already (1/2/3)
     99032: "HUQ050",   # (not yet in DB; still reserve mapping)
+    99033: "HUQ070"
 }
 
 
