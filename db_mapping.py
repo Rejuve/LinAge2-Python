@@ -17,54 +17,47 @@ from typing import Any, Callable, Dict, Optional
 # -----------------------------
 lab_mapping: Dict[int, str] = {
     # Vitals / anthropometry
-    99001: "BPXPLS",   # Pulse rate (beats/min, 60-sec pulse)
-    11810: "BPXSAR",   # Systolic blood pressure (mmHg)
-    11820: "BPXDAR",   # Diastolic blood pressure (mmHg)
-
-    # Kidney (urine)
+    99001: "BPXPLS",  # Pulse rate (beats/min, 60-sec pulse), 11800
+    11810: "BPXSAR",  # Systolic blood pressure (mmHg)
+    11820: "BPXDAR",  # Diastolic blood pressure (mmHg)
+    # Kidney (urine), check with this 14010
     99002: "URXUMASI",  # Urine albumin (SI)
     99003: "URXUCRSI",  # Urine creatinine (SI)
-
     # Iron panel
-    10270: "LBDIRNSI",   # Serum iron (note: DB may be mg/dL; see UNIT_SCALE)
-    99004: "LBDTIBSI",   # TIBC
-    99005: "LBXPCT",     # Transferrin saturation (%)
-    10570: "LBDFERSI",   # Ferritin
-
+    10270: "LBDIRNSI",  # Serum iron (note: DB may be mg/dL; see UNIT_SCALE)
+    99004: "LBDTIBSI",  # TIBC, Total iron-binding capacity
+    99005: "LBXPCT",  # Transferrin saturation (%)
+    10570: "LBDFERSI",  # Ferritin
     # Folate / B12 / cotinine
-    10610: "LBDFOLSI",   # Folate
-    99006: "LBDB12SI",   # Vitamin B12 (warning: you noted DB might be dietary intake)
-    13350: "LBXCOT",     # Cotinine / smoking-related
-
+    10610: "LBDFOLSI",  # Folate
+    99006: "LBDB12SI",  # Vitamin B12 (warning: you noted DB might be dietary intake)
+    13350: "LBXCOT",  # Cotinine / smoking-related
     # CBC (white cells)
-    10350: "LBXWBCSI",   # WBC
-    99007: "LBXLYPCT",
-    99008: "LBXMOPCT",
-    10370: "LBXNEPCT",
-    10380: "LBXEOPCT",
-    13170: "LBXBAPCT",
-    99009: "LBDLYMNO",
-    99010: "LBDMONO",
-    10391: "LBDNENO",
-    99011: "LBDEONO",
-    99012: "LBDBANO",
-
+    10350: "LBXWBCSI",  # WBC
+    99007: "LBXLYPCT",  # Lymphocyte %, 10360
+    99008: "LBXMOPCT",  # Monocyte %, 13160
+    10370: "LBXNEPCT",  # Neutrophil %
+    10380: "LBXEOPCT",  # Eosinophil %
+    13170: "LBXBAPCT",  # Basophil %
+    99009: "LBDLYMNO",  # Lymphocyte absolute #, 10390
+    99010: "LBDMONO",  # Monocyte absolute #, 13180
+    10391: "LBDNENO",  # Neutrophil absolute #
+    99011: "LBDEONO",  # Eosinophil absolute #, 13190
+    99012: "LBDBANO",  # Basophil absolute #, 13200
     # CBC (red cells / platelets)
     13210: "LBXRBCSI",
     10400: "LBXHGB",
     13220: "LBXHCT",
-    99013: "LBXMCVSI",  # MCV
-    99014: "LBXMCHSI",  # MCH
-    99015: "LBXMC",     # MCHC
+    99013: "LBXMCVSI",  # MCV, 13210
+    99014: "LBXMCHSI",  # MCH, 13230
+    99015: "LBXMC",  # MCHC, 10420
     10430: "LBXRDW",
     13240: "LBXPLTSI",
     13250: "LBXMPSI",
-
     # Inflammation / glycemia / cardiac
     13440: "LBXCRP",
-    99016: "LBXGH",     # HbA1c
-    99017: "SSBNP",     # NT-proBNP
-
+    99016: "LBXGH",  # HbA1c, 10640
+    99017: "SSBNP",  # NT-proBNP,
     # Basic chem (SI set)
     13280: "LBDSALSI",  # Albumin
     10170: "LBXSATSI",  # ALT
@@ -81,21 +74,21 @@ lab_mapping: Dict[int, str] = {
     10340: "LBDSUASI",  # Uric acid (note scaling)
     10230: "LBDSCRSI",  # Creatinine (note scaling)
     10280: "LBXSNASI",  # Sodium
-    13320: "LBXSKSI",   # Potassium
+    13320: "LBXSKSI",  # Potassium
     10210: "LBXSCLSI",  # Chloride
     10240: "LBDSGBSI",  # Globulin (note scaling)
-    99034: "LBDTCSI",
-    99035: 'LBDHDLSI',
-    99036: 'LBDSTRSI' #these three things needed for LDLV
+    99034: "LBDTCSI",  # Total cholesterol, 10310
+    99035: "LBDHDLSI",  # HDL cholesterol, 10300
+    99036: "LBDSTRSI",  # these three things needed for LDLV
+    # LDL-cholesterol : 13960
 }
 
 ques_mapping: Dict[int, str] = {
-    14190: "BPQ020",   # Ever told you had high blood pressure?
-    14199: "DIQ010",   # Doctor told you have diabetes?
-    14254: "KIQ020",   # Weak/failing kidneys?
-    14219: "MCQ010",   # Asthma?
-    99018: "MCQ053",
-
+    14190: "BPQ020",  # Ever told you had high blood pressure?
+    14199: "DIQ010",  # Doctor told you have diabetes?
+    14254: "KIQ020",  # Weak/failing kidneys?
+    14219: "MCQ010",  # Asthma?
+    99018: "MCQ053",  # Arthritis?, 14222
     14222: "MCQ160A",
     14223: "MCQ160B",
     14224: "MCQ160C",
@@ -103,24 +96,21 @@ ques_mapping: Dict[int, str] = {
     14225: "MCQ160E",
     14226: "MCQ160F",
     14227: "MCQ160G",
-    99020: "MCQ160I",
-    99021: "MCQ160J",
+    99020: "MCQ160I",  # thyroid_other_diseases_of, (yes/no/ 0/1)
+    99021: "MCQ160J",  # obesity_and_overweight
     99022: "MCQ160K",
-    99023: "MCQ160L",
-    99024: "MCQ220",
-
-    99025: "OSQ010A",
+    99023: "MCQ160L",  # 10850
+    99024: "MCQ220",  # 12160
+    99025: "OSQ010A",  # 12030
     99026: "OSQ010B",
-    99027: "OSQ010C",
-    99028: "OSQ060",
-
-    99030: "PFQ056",
-
+    99027: "OSQ010C",  # 12060
+    99028: "OSQ060",  # 10860
+    99030: "PFQ056",  # 12100, 12340
     # Self-rated health
-    99031: "HUQ010",   # (not yet in DB; still reserve mapping)
-    14211: "HUQ020",   # matches NHANES already (1/2/3)
-    99032: "HUQ050",   # (not yet in DB; still reserve mapping)
-    99033: "HUQ070"
+    99031: "HUQ010",  # (not yet in DB; still reserve mapping),
+    14211: "HUQ020",  # matches NHANES already (1/2/3), 14211
+    99032: "HUQ050",  # (not yet in DB; still reserve mapping), 10740
+    99033: "HUQ070",
 }
 
 
