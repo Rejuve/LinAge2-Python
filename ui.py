@@ -1,4 +1,4 @@
-# ---------- codebook_mapping.py ----------
+# ---------- ui.py ----------
 import gradio as gr
 import pandas as pd
 import numpy as np
